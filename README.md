@@ -9,6 +9,25 @@
 사내 Confluence에 정리된 DB 스키마(ERD, 테이블 정의서)를 기반으로, Slack에서 자연어로 데이터 조회 요청을 하면 Claude AI가 실제 테이블명과 컬럼명을 사용한 SQL 쿼리를 자동 생성해서 Slack으로 응답해주는 시스템입니다.
 
 DB에 직접 접근하지 않고 **SQL 쿼리만 생성**해서 전달하므로, 실제 실행은 사용자가 직접 합니다.
+---
+
+## 💬 사용 방법
+
+Slack `#data-query` 채널에서 자연어로 질문하면 됩니다.
+
+```
+이번 달 주문 건수를 알려줘
+```
+
+```
+KDI_QueryBot  오후 2:47
+✅ 요청: 이번달 주문건수 알려줘
+🗄 DB: ORACLE
+📝 SQL:
+SELECT COUNT(*) AS ORDER_COUNT FROM ORD_ORD_BSC_D
+WHERE ORD_DTM >= TRUNC(SYSDATE, 'MM')
+AND ORD_DTM < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)
+```
 
 ---
 ## n8n flow
@@ -168,75 +187,9 @@ confluence-ai-query-bot/
 │   └── troubleshooting.md     # 시행착오 정리
 └── .env.example               # 환경변수 예시
 ```
-
 ---
 
-## 🚧 개발 중 시행착오
-
-### 1. Windows PowerShell 실행 정책 오류
-- **문제**: `n8n start` 실행 시 스크립트 차단
-- **해결**: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
-
-### 2. Slack Trigger 외부 URL 문제
-- **문제**: Slack 서버가 localhost로 webhook 전달 불가
-- **시도**: ngrok (인증 오류) → localtunnel (503 에러) → n8n Cloud (유료)
-- **해결**: Cloudflare Tunnel `--protocol http2` 옵션으로 해결
-
-### 3. Slack Socket Mode 불안정
-- **문제**: n8n 2.8.4에서 Socket Mode 연결은 되나 이벤트 수신 안 됨
-- **해결**: Webhook 방식으로 전환 + Cloudflare Tunnel 조합
-
-### 4. Slack Challenge 검증 실패
-- **문제**: Slack URL 등록 시 challenge 파라미터 응답 실패
-- **해결**: Code 노드에서 `url_verification` 타입 처리 추가
-
-### 5. Slack 무한 루프 (중복 응답)
-- **문제**: 봇이 보낸 메시지를 다시 트리거로 감지해서 무한 반복
-- **원인1**: Claude API 처리 시간 > 3초 → Slack 재시도
-- **원인2**: 봇 메시지도 `message.channels` 이벤트로 감지
-- **해결**: Respond to Webhook을 If 분기 직후로 이동(즉시 200 반환) + `bot_id` 필터링
-
-### 6. AI API 선택 문제
-- **시도1**: Claude API → 초기 크레딧 부족
-- **시도2**: Gemini API → 한국 무료 티어 차단 (limit: 0)
-- **시도3**: Ollama llama3.2 → CPU 95% (Ryzen 7 4700U 한계)
-- **해결**: Claude API $5 크레딧 충전 후 사용
-
-### 7. Confluence 스키마 조회 방식
-- **문제**: keyword 기반 검색은 부정확
-- **해결**: 최상단 pageId(186452952) 기준 하위 페이지 전체 재귀 조회
-
-### 8. n8n localhost 연결 오류
-- **문제**: n8n에서 `localhost:5000` 접근 거부
-- **해결**: `localhost` → `127.0.0.1` 로 변경
-
-### 9. Gmail OAuth 실패
-- **문제**: localhost 환경에서 Google OAuth 콜백 불가
-- **해결**: 알람 채널을 Gmail → Slack으로 변경
-
----
-
-## 💬 사용 방법
-
-Slack `#data-query` 채널에서 자연어로 질문하면 됩니다.
-
-```
-이번 달 주문 건수를 알려줘
-```
-
-```
-KDI_QueryBot  오후 2:47
-✅ 요청: 이번달 주문건수 알려줘
-🗄 DB: ORACLE
-📝 SQL:
-SELECT COUNT(*) AS ORDER_COUNT FROM ORD_ORD_BSC_D
-WHERE ORD_DTM >= TRUNC(SYSDATE, 'MM')
-AND ORD_DTM < ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)
-```
-
----
-
-## 📋 환경변수 예시 (.env.example)
+## 📋 환경변수 예시
 
 ```
 CONFLUENCE_URL=https://wiki.your-company.com
