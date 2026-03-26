@@ -1,0 +1,307 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5000/get_schema",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        80
+      ],
+      "id": "26508511-ebbc-4660-b182-a19e13377fd6",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"x-api-key\": \"YOUR_CLAUDE_API_KEY_HERE\",\n  \"anthropic-version\": \"2023-06-01\",\n  \"content-type\": \"application/json\"\n}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        640,
+        80
+      ],
+      "id": "382f0c3b-4d78-451a-9130-ce79d14d7003",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const schema = $('HTTP Request').item.json.schema;\n// const question = $('Telegram Trigger').item.json.message.text;\n// const question = $('Webhook').item.json.body.question;\nconst question = $('Code in JavaScript2').item.json.question;\n\nconst body = {\n  model: \"claude-opus-4-5\",\n  max_tokens: 1024,\n  system: `당신은 DB2와 Oracle SQL 전문가입니다.\n아래는 Confluence에서 가져온 실제 DB 스키마 문서입니다.\n이 문서를 분석해서 사용자 요청에 맞는 정확한 SQL을 생성하세요.\n반드시 아래 JSON 형식만 반환하세요. 다른 텍스트 절대 금지.\n{\"db_type\": \"db2\" 또는 \"oracle\", \"sql\": \"실제 테이블명/컬럼명 사용한 쿼리\"}\n\n## Confluence DB 스키마\n${schema}`,\n  messages: [\n    { role: \"user\", content: question }\n  ]\n};\n\nreturn [{ json: { body: JSON.stringify(body) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        80
+      ],
+      "id": "a0b5e8d6-2a15-46b8-9bf3-d96795cb22ea",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0ANYBLKVCJ",
+          "mode": "list",
+          "cachedResultName": "data-query"
+        },
+        "text": "=✅ 요청: {{ $('Code in JavaScript2').item.json.question }}\n\n🗄 DB: {{ JSON.parse($('HTTP Request1').item.json.content[0].text.replace(/```json\\n?/g, '').replace(/```/g, '').trim()).db_type.toUpperCase() }}\n\n📝 SQL:\n{{ JSON.parse($('HTTP Request1').item.json.content[0].text.replace(/```json\\n?/g, '').replace(/```/g, '').trim()).sql }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        848,
+        80
+      ],
+      "id": "f50a2f19-38d3-4c7c-a714-c2b6c1a9e0ec",
+      "name": "Send a message",
+      "webhookId": "61935fae-3daa-4cf1-9bf7-1789a054a1f8",
+      "credentials": {
+        "slackApi": {
+          "id": "duryWU61soqxI433",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        -224
+      ],
+      "id": "a53e074d-30fd-4d67-84cb-a9016a2c6459",
+      "name": "Webhook1",
+      "webhookId": "f8ad0e1c-3b10-483d-8208-ec4abec38e65"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst body = item.body || item;\n\n// Slack URL 검증\nif (body.type === 'url_verification') {\n  return [{ json: { isChallenge: true, challenge: body.challenge } }];\n}\n\nconst event = body.event || {};\nconst text = event.text || '';\nconst channel = event.channel || '';\nconst botId = event.bot_id;\nconst subtype = event.subtype;\n\n// 봇 메시지 또는 자동화 메시지면 무시\nif (botId || subtype === 'bot_message' || !text) {\n  return [{ json: { isChallenge: true, challenge: '' } }];\n}\n\nreturn [{ json: { isChallenge: false, question: text, channel: channel } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -224
+      ],
+      "id": "450604fc-57cc-4c40-8128-85b1b9e65345",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.isChallenge ? JSON.stringify({challenge: $json.challenge}) : JSON.stringify({ok: true}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        592,
+        -224
+      ],
+      "id": "1fa0520c-f304-49b9-a208-c498059104f3",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ec985e51-24cc-4b15-bbae-c4176f8ade7c",
+              "leftValue": "=={{ $('Code in JavaScript2').item.json.isChallenge }}",
+              "rightValue": "true (Boolean)",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        752,
+        -224
+      ],
+      "id": "55230b30-f191-4de3-bb42-42b42dd11bf6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=={{ $json.challenge }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        976,
+        -336
+      ],
+      "id": "8f20f960-8272-4ca3-a75a-42b2481b76ae",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        976,
+        -176
+      ],
+      "id": "a7ee95a5-6eb4-4d77-9002-70912f2d736d",
+      "name": "Respond to Webhook2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook1": {
+      "main": [
+        []
+      ]
+    },
+    "Respond to Webhook2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "452c2506-dea0-4fed-bbba-249491e4604e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a793bebb2ff3deb75ac3d2f3e986ae9c913af4a16f9f73cc33941581aeb158c4"
+  },
+  "id": "mWREYkZ3vkia7q9Y",
+  "tags": []
+}
