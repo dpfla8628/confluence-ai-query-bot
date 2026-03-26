@@ -189,14 +189,21 @@ confluence-ai-query-bot/
 ```
 ---
 
-## 📋 환경변수 예시
-
+## ⚙️ 설정값 입력 위치
 ```
-CONFLUENCE_URL=https://wiki.your-company.com
-CONFLUENCE_USERNAME=your_username
-CONFLUENCE_PASSWORD=your_password
-CONFLUENCE_ROOT_PAGE_ID=186452952
-CLAUDE_API_KEY=sk-ant-api03-xxxxx
-SLACK_BOT_TOKEN=xoxb-xxxxx
-SLACK_APP_TOKEN=xapp-xxxxx
+📁 mcp/confluence_mcp.py
+├── CONFLUENCE_URL      = "https://wiki.your-company.com"
+├── USERNAME            = "your_confluence_id"
+├── PASSWORD            = "your_confluence_password"
+└── ROOT_PAGE_ID        = "186452952"
+
+🔧 n8n 워크플로우
+├── Slack Credential
+│   └── Access Token    = xoxb-xxxx (Slack App → OAuth & Permissions)
+└── HTTP Request 노드 (Claude API) → Headers
+    └── x-api-key       = sk-ant-api03-xxxx (console.anthropic.com)
+
+🌐 Slack App (api.slack.com/apps)
+└── Event Subscriptions → Request URL
+    └── https://[cloudflare-url]/webhook/slack-events
 ```
